@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard FPF — Classificação</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --verde1: rgba(15,110,86,.18);
+      --verde2: rgba(15,110,86,.10);
+      --verde3: rgba(15,110,86,.05);
+      --azul:   rgba(24,95,165,.12);
+      --amber:  rgba(186,117,23,.10);
+      --fundo:  #f8f8f6;
+      --card:   #ffffff;
+      --borda:  #e2e2de;
+      --texto:  #1a1a18;
+      --muted:  #6b6b67;
+      --accent: #185FA5;
+      --verde:  #0F6E56;
+      --red:    #993C1D;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--fundo); color: var(--texto); min-height: 100vh; padding: 0 0 3rem; }
+
+    /* HEADER */
+    .site-header { background: var(--card); border-bottom: 1px solid var(--borda); padding: 1rem 1.5rem; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 50; }
+    .site-header h1 { font-size: 16px; font-weight: 600; }
+    .site-header p  { font-size: 12px; color: var(--muted); }
+    .badge-ao-vivo { margin-left: auto; background: #ecfdf5; color: #065f46; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid #6ee7b7; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .badge-ao-vivo::before { content: ''; width: 7px; height: 7px; background: #10b981; border-radius: 50%; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* TABS */
+    .tabs { background: var(--card); border-bottom: 1px solid var(--borda); display: flex; gap: 0; padding: 0 1.5rem; }
+    .tab { padding: 10px 18px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; white-space: nowrap; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover:not(.active) { color: var(--texto); }
+
+    /* CONTAINER */
+    .container { max-width: 980px; margin: 0 auto; padding: 1.5rem 1rem; }
+
+    /* BUSCA */
+    .search-wrap { position: relative; margin-bottom: 1.5rem; }
+    .search-wrap input { width: 100%; padding: 11px 16px 11px 42px; border: 1px solid var(--borda); border-radius: 10px; background: var(--card); font-size: 15px; color: var(--texto); outline: none; transition: border-color .15s; }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 18px; pointer-events: none; }
+    .dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--card); border: 1px solid var(--borda); border-radius: 10px; max-height: 240px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    .dropdown.open { display: block; }
+    .dd-item { padding: 10px 16px; cursor: pointer; font-size: 14px; border-bottom: 1px solid var(--borda); display: flex; justify-content: space-between; align-items: center; }
+    .dd-item:last-child { border-bottom: none; }
+    .dd-item:hover { background: var(--fundo); }
+    .dd-item span { font-size: 12px; color: var(--muted); }
+
+    /* MÉTRICAS */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin-bottom: 1.25rem; }
+    .metric { background: var(--card); border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; }
+    .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .metric-value { font-size: 22px; font-weight: 700; color: var(--texto); }
+    .metric-value.blue  { color: var(--accent); }
+    .metric-value.green { color: var(--verde); }
+    .metric-value.red   { color: var(--red); }
+    .time-tag { display: inline-flex; align-items: center; gap: 6px; background: #eff6ff; color: #1e40af; font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #bfdbfe; }
+    .status-badge { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; }
+
+    /* LEGENDA */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 1.25rem; padding: 10px 14px; background: var(--card); border: 1px solid var(--borda); border-radius: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+
+    /* GRUPOS */
+    .group-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 1.25rem 0 .5rem; padding-bottom: 6px; border-bottom: 1px solid var(--borda); }
+    .outros-sep { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 2rem 0 .5rem; padding: 1rem 0 .5rem; border-top: 1px solid var(--borda); border-bottom: 1px solid var(--borda); }
+
+    /* TABELA CLASSIFICAÇÃO */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--borda); margin-bottom: .5rem; background: var(--card); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: var(--fundo); padding: 8px 10px; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    thead th:nth-child(2) { text-align: left; min-width: 150px; }
+    thead th:first-child { width: 32px; }
+    tbody td { padding: 8px 10px; text-align: center; border-top: 1px solid var(--borda); white-space: nowrap; }
+    tbody td:first-child { font-weight: 600; color: var(--muted); font-size: 12px; }
+    tbody td:nth-child(2) { text-align: left; font-weight: 600; }
+    tr.c1  { background: var(--verde1); }
+    tr.c2  { background: var(--verde2); }
+    tr.c3  { background: var(--verde3); }
+    tr.c4a { background: var(--azul); }
+    tr.c4b { background: var(--amber); }
+    tr.destaque td:nth-child(2) { color: var(--accent); }
+    tr.destaque td:first-child::before { content: "▶ "; color: var(--accent); font-size: 9px; }
+
+    /* MATA-MATA */
+    .mm-intro { font-size: 13px; color: var(--muted); margin-bottom: 1.25rem; padding: 10px 14px; background: var(--card); border: 1px solid var(--borda); border-radius: 10px; line-height: 1.6; }
+    .mm-section-title { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 1.5rem 0 .75rem; padding-bottom: 6px; border-bottom: 1px solid var(--borda); }
+    .chaves-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-bottom: 1rem; }
+    .chave-card { background: var(--card); border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; }
+    .chave-header { background: var(--fundo); padding: 8px 14px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--borda); }
+    .chave-time { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--borda); }
+    .chave-time:last-child { border-bottom: none; }
+    .chave-pos { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
+    .pos-1 { background: rgba(15,110,86,.15); color: #0F6E56; }
+    .pos-2 { background: rgba(24,95,165,.12); color: #185FA5; }
+    .pos-3 { background: rgba(186,117,23,.15); color: #854F0B; }
+    .pos-4a { background: rgba(24,95,165,.12); color: #185FA5; }
+    .chave-nome { font-size: 13px; font-weight: 600; flex: 1; }
+    .chave-pts { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .chave-vs { text-align: center; font-size: 11px; color: var(--muted); padding: 4px; background: var(--fundo); border-top: 1px solid var(--borda); border-bottom: 1px solid var(--borda); font-weight: 600; letter-spacing: .05em; }
+    .pendente { opacity: .45; font-style: italic; }
+
+    /* LOADING / ERRO */
+    .loading, .erro { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 15px; }
+    .erro { color: var(--red); }
+    .spinner { width: 28px; height: 28px; border: 3px solid var(--borda); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .footer-note { font-size: 11px; color: var(--muted); text-align: right; margin-top: 1rem; }
+
+    @media (max-width: 600px) {
+      .site-header h1 { font-size: 14px; }
+      .metric-value { font-size: 18px; }
+      .tabs { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <span style="font-size:20px">⚽</span>
+  <div>
+    <h1 id="titulo">Carregando...</h1>
+    <p id="subtitulo">Dados da Federação Paulista de Futebol</p>
+  </div>
+  <div class="badge-ao-vivo">Ao vivo</div>
+</header>
+
+<nav class="tabs">
+  <div class="tab active" onclick="trocarAba('classificacao', this)">Classificação</div>
+  <div class="tab" onclick="trocarAba('matamata', this)">Previsão 2ª Fase</div>
+</nav>
+
+<div class="container">
+
+  <!-- ABA CLASSIFICAÇÃO -->
+  <div id="aba-classificacao">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="busca" placeholder="Buscar time..." autocomplete="off" disabled>
+      <div class="dropdown" id="dropdown"></div>
+    </div>
+    <div id="app">
+      <div class="loading"><div class="spinner"></div>Buscando dados da FPF...</div>
+    </div>
+  </div>
+
+  <!-- ABA MATA-MATA -->
+  <div id="aba-matamata" style="display:none">
+    <div id="mm-content">
+      <div class="loading"><div class="spinner"></div>Aguardando dados...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const ENDPOINT = '/api/classificacao';
+
+let grupos = [];
+let todosOsTimes = [];
+let clubeSelecionado = null;
+let abaAtual = 'classificacao';
+
+/* ─── CHAVEAMENTO 2ª FASE (conforme regulamento da imagem) ─── */
+/* Grupos 11–20: jogam 1ºs e 3ºs colocados
+   Grupos 21–26: jogam 2ºs colocados + melhores 4ºs */
+const CHAVEAMENTO = [
+  // Grupos de 1ºs x 3ºs
+  { id:'G11', nome:'Grupo 11', times:[ {origem:'01',pos:1}, {origem:'10',pos:3} ] },
+  { id:'G12', nome:'Grupo 12', times:[ {origem:'02',pos:1}, {origem:'09',pos:3} ] },
+  { id:'G13', nome:'Grupo 13', times:[ {origem:'03',pos:1}, {origem:'08',pos:3} ] },
+  { id:'G14', nome:'Grupo 14', times:[ {origem:'04',pos:1}, {origem:'07',pos:3} ] },
+  { id:'G15', nome:'Grupo 15', times:[ {origem:'05',pos:1}, {origem:'06',pos:3} ] },
+  { id:'G16', nome:'Grupo 16', times:[ {origem:'06',pos:1}, {origem:'05',pos:3} ] },
+  { id:'G17', nome:'Grupo 17', times:[ {origem:'07',pos:1}, {origem:'04',pos:3} ] },
+  { id:'G18', nome:'Grupo 18', times:[ {origem:'08',pos:1}, {origem:'03',pos:3} ] },
+  { id:'G19', nome:'Grupo 19', times:[ {origem:'09',pos:1}, {origem:'02',pos:3} ] },
+  { id:'G20', nome:'Grupo 20', times:[ {origem:'10',pos:1}, {origem:'01',pos:3} ] },
+  // Grupos de 2ºs
+  { id:'G21', nome:'Grupo 21', times:[ {origem:'01',pos:2}, {origem:'07',pos:2} ] },
+  { id:'G22', nome:'Grupo 22', times:[ {origem:'02',pos:2}, {origem:'08',pos:2} ] },
+  { id:'G23', nome:'Grupo 23', times:[ {origem:'03',pos:2}, {origem:'09',pos:2} ] },
+  { id:'G24', nome:'Grupo 24', times:[ {origem:'04',pos:2}, {origem:'10',pos:2} ] },
+  { id:'G25', nome:'Grupo 25', times:[ {origem:'05',pos:2}, {origem:null,pos:'m4a'} ] },
+  { id:'G26', nome:'Grupo 26', times:[ {origem:'06',pos:2}, {origem:null,pos:'m4b'} ] },
+];
+
+/* ─── PARSE ─── */
+function parseGrupos(retorno) {
+  const map = {};
+  retorno.forEach(t => {
+    const g = t.NomeGrupo.padStart(2,'0');
+    if (!map[g]) map[g] = [];
+    map[g].push(t);
+  });
+  return Object.entries(map)
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([nome, times]) => ({
+      nome: 'Grupo ' + nome,
+      id: nome,
+      times: times.sort((a,b) => a.Classificacao - b.Classificacao)
+    }));
+}
+
+/* ─── TOP 2 DOS 4ºS ─── */
+function getTop2dos4os() {
+  const quartos = grupos.map(g => g.times[3]).filter(Boolean);
+  return [...quartos]
+    .sort((a,b) => b.Pontos-a.Pontos || b.SaldoGols-a.SaldoGols || b.GolsPro-a.GolsPro)
+    .slice(0,2);
+}
+
+/* ─── BUSCAR TIME POR GRUPO+POS ─── */
+function getTime(grupoId, posicao) {
+  const g = grupos.find(x => x.id === grupoId);
+  if (!g) return null;
+  return g.times[posicao - 1] || null;
+}
+
+/* ─── HELPERS ─── */
+function sg(n) { return (n >= 0 ? '+' : '') + n; }
+
+function rowClass(pos, idClube, top2ids) {
+  if (pos===1) return 'c1';
+  if (pos===2) return 'c2';
+  if (pos===3) return 'c3';
+  if (pos===4) return top2ids.includes(idClube) ? 'c4a' : 'c4b';
+  return '';
+}
+
+/* ─── TABELA DE GRUPO ─── */
+function buildTabela(grupo, destaque, top2ids) {
+  const rows = grupo.times.map(t => {
+    const rc = rowClass(t.Classificacao, t.IdClube, top2ids);
+    const sel = destaque===t.IdClube ? ' destaque' : '';
+    return `<tr class="${rc}${sel}">
+      <td>${t.Classificacao}</td>
+      <td title="${t.NomePopularClube}">${t.NomePopularClube}</td>
+      <td><strong>${t.Pontos}</strong></td>
+      <td>${t.NumeroPartidas}</td>
+      <td>${t.Vitorias}</td><td>${t.Empates}</td><td>${t.Derrota}</td>
+      <td>${t.GolsPro}</td><td>${t.GolsContra}</td><td>${sg(t.SaldoGols)}</td>
+      <td>${t.VitoriasPenaltis}</td><td>${t.CartoesAmarelos}</td><td>${t.CartoesVermelhos}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="group-label">${grupo.nome}</div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>#</th><th>Time</th>
+      <th title="Pontos">P</th><th title="Jogos">J</th>
+      <th title="Vitórias">V</th><th title="Empates">E</th><th title="Derrotas">D</th>
+      <th title="Gols Pró">GP</th><th title="Gols Contra">GC</th><th title="Saldo">SG</th>
+      <th title="Vitórias Pênalti">VP</th><th title="C. Amarelo">CA</th><th title="C. Vermelho">CV</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+/* ─── MÉTRICAS DO TIME ─── */
+function buildMetrics(t, gNome, top2ids) {
+  const sgv = sg(t.SaldoGols);
+  const sgc = t.SaldoGols>=0?'green':'red';
+  const pos = t.Classificacao;
+  const isTop2 = top2ids.includes(t.IdClube);
+  const status =
+    pos<=3 ? '🟢 Classificado direto para a 2ª fase' :
+    pos===4&&isTop2 ? '🔵 2º melhor 4º colocado — classificado para a 2ª fase' :
+    pos===4 ? '🟡 4º colocado — fora do top 2 no momento' : '⚪ Em disputa';
+  return `<div class="time-tag">📌 ${gNome} · ${t.NomePopularClube} · ${pos}º lugar</div>
+  <div class="metrics-grid">
+    <div class="metric"><div class="metric-label">Posição</div><div class="metric-value blue">${pos}º</div></div>
+    <div class="metric"><div class="metric-label">Pontos</div><div class="metric-value">${t.Pontos}</div></div>
+    <div class="metric"><div class="metric-label">Jogos</div><div class="metric-value">${t.NumeroPartidas}</div></div>
+    <div class="metric"><div class="metric-label">Vitórias</div><div class="metric-value green">${t.Vitorias}</div></div>
+    <div class="metric"><div class="metric-label">Empates</div><div class="metric-value">${t.Empates}</div></div>
+    <div class="metric"><div class="metric-label">Derrotas</div><div class="metric-value red">${t.Derrota}</div></div>
+    <div class="metric"><div class="metric-label">Gols Pró</div><div class="metric-value">${t.GolsPro}</div></div>
+    <div class="metric"><div class="metric-label">Gols Contra</div><div class="metric-value">${t.GolsContra}</div></div>
+    <div class="metric"><div class="metric-label">Saldo</div><div class="metric-value ${sgc}">${sgv}</div></div>
+    <div class="metric"><div class="metric-label">Vit. Pênalti</div><div class="metric-value">${t.VitoriasPenaltis}</div></div>
+    <div class="metric"><div class="metric-label">C. Amarelos</div><div class="metric-value">${t.CartoesAmarelos}</div></div>
+    <div class="metric"><div class="metric-label">C. Vermelhos</div><div class="metric-value">${t.CartoesVermelhos}</div></div>
+  </div>
+  <div class="status-badge">${status}</div>`;
+}
+
+/* ─── CARD DE CHAVE (MATA-MATA) ─── */
+function buildChaveCard(chave, top2) {
+  const linhas = chave.times.map((slot, idx) => {
+    let time = null;
+    let posLabel = '';
+    let posCls = '';
+
+    if (slot.pos === 'm4a') {
+      time = top2[0] || null;
+      posLabel = '1º melhor 4º';
+      posCls = 'pos-4a';
+    } else if (slot.pos === 'm4b') {
+      time = top2[1] || null;
+      posLabel = '2º melhor 4º';
+      posCls = 'pos-4a';
+    } else {
+      time = getTime(slot.origem, slot.pos);
+      posLabel = `${slot.pos}º G${slot.origem}`;
+      posCls = slot.pos===1?'pos-1':slot.pos===2?'pos-2':'pos-3';
+    }
+
+    const pendente = !time;
+    return `<div class="chave-time${pendente?' pendente':''}">
+      <span class="chave-pos ${posCls}">${posLabel}</span>
+      <span class="chave-nome">${time ? time.NomePopularClube : '—'}</span>
+      ${time ? `<span class="chave-pts">${time.Pontos}pts</span>` : ''}
+    </div>
+    ${idx===0 ? '<div class="chave-vs">× VS ×</div>' : ''}`;
+  }).join('');
+
+  return `<div class="chave-card">
+    <div class="chave-header">${chave.nome}</div>
+    ${linhas}
+  </div>`;
+}
+
+/* ─── RENDER MATA-MATA ─── */
+function renderMataMata() {
+  const top2 = getTop2dos4os();
+  const upd = grupos[0]?.times[0]?.UltimaSincronizacao?.replace('T',' ').slice(0,16)||'';
+
+  const g1a10  = CHAVEAMENTO.slice(0,10);
+  const g21a26 = CHAVEAMENTO.slice(10);
+
+  let html = `<div class="mm-intro">
+    Previsão da 2ª fase montada com base na classificação atual da 1ª fase.
+    Os confrontos seguem o regulamento oficial da FPF:
+    <strong>Grupos 11–20</strong> reúnem os 1ºs e 3ºs colocados de cada grupo;
+    <strong>Grupos 21–26</strong> reúnem os 2ºs colocados e os 2 melhores 4ºs.
+    Atualiza automaticamente a cada carregamento.
+  </div>`;
+
+  html += `<div class="mm-section-title">Grupos 11 a 20 — 1ºs e 3ºs colocados</div>`;
+  html += `<div class="chaves-grid">`;
+  g1a10.forEach(c => { html += buildChaveCard(c, top2); });
+  html += `</div>`;
+
+  html += `<div class="mm-section-title">Grupos 21 a 26 — 2ºs colocados + melhores 4ºs</div>`;
+  html += `<div class="chaves-grid">`;
+  g21a26.forEach(c => { html += buildChaveCard(c, top2); });
+  html += `</div>`;
+
+  html += `<div class="footer-note">Fonte: FPF · Última atualização: ${upd}</div>`;
+  document.getElementById('mm-content').innerHTML = html;
+}
+
+/* ─── RENDER CLASSIFICAÇÃO ─── */
+const LEGENDA = `<div class="legend">
+  <div class="legend-item"><span class="legend-dot" style="background:rgba(15,110,86,.5)"></span>1º — classificado</div>
+  <div class="legend-item"><span class="legend-dot" style="background:rgba(15,110,86,.3)"></span>2º — classificado</div>
+  <div class="legend-item"><span class="legend-dot" style="background:rgba(15,110,86,.14)"></span>3º — classificado</div>
+  <div class="legend-item"><span class="legend-dot" style="background:rgba(24,95,165,.3)"></span>4º (top 2 entre grupos) — classificado</div>
+  <div class="legend-item"><span class="legend-dot" style="background:rgba(186,117,23,.25)"></span>4º (fora do top 2)</div>
+</div>`;
+
+function renderClassificacao() {
+  const top2 = getTop2dos4os().map(t=>t.IdClube);
+  const app = document.getElementById('app');
+  const upd = grupos[0]?.times[0]?.UltimaSincronizacao?.replace('T',' ').slice(0,16)||'';
+  let html = LEGENDA;
+
+  if (clubeSelecionado !== null) {
+    let gSel=null, tSel=null;
+    for (const g of grupos) {
+      const t = g.times.find(x=>x.IdClube===clubeSelecionado);
+      if (t) { gSel=g; tSel=t; break; }
+    }
+    if (tSel) {
+      html += buildMetrics(tSel, gSel.nome, top2);
+      html += buildTabela(gSel, clubeSelecionado, top2);
+      const outros = grupos.filter(g=>g.nome!==gSel.nome);
+      if (outros.length) {
+        html += `<div class="outros-sep">Outros grupos</div>`;
+        outros.forEach(g => { html += buildTabela(g, null, top2); });
+      }
+    }
+  } else {
+    grupos.forEach(g => { html += buildTabela(g, null, top2); });
+  }
+
+  html += `<div class="footer-note">Fonte: FPF · Última atualização: ${upd}</div>`;
+  app.innerHTML = html;
+}
+
+/* ─── ABAS ─── */
+function trocarAba(aba, el) {
+  abaAtual = aba;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('aba-classificacao').style.display = aba==='classificacao' ? '' : 'none';
+  document.getElementById('aba-matamata').style.display = aba==='matamata' ? '' : 'none';
+  if (aba==='matamata' && grupos.length) renderMataMata();
+}
+
+/* ─── BUSCA ─── */
+function setupBusca() {
+  const inp = document.getElementById('busca');
+  const dd = document.getElementById('dropdown');
+  const uniq = [...new Map(todosOsTimes.map(t=>[t.IdClube,t])).values()]
+    .sort((a,b)=>a.NomePopularClube.localeCompare(b.NomePopularClube));
+
+  inp.disabled = false;
+  inp.placeholder = 'Buscar time...';
+
+  inp.addEventListener('input', () => {
+    const v = inp.value.trim().toLowerCase();
+    if (v.length<2) { dd.classList.remove('open'); return; }
+    const res = uniq.filter(t=>t.NomePopularClube.toLowerCase().includes(v));
+    if (!res.length) { dd.classList.remove('open'); return; }
+    dd.innerHTML = res.map(t => {
+      const g = grupos.find(g=>g.times.some(x=>x.IdClube===t.IdClube));
+      return `<div class="dd-item" data-id="${t.IdClube}">${t.NomePopularClube}<span>${g?.nome||''}</span></div>`;
+    }).join('');
+    dd.classList.add('open');
+  });
+
+  dd.addEventListener('click', e => {
+    const item = e.target.closest('.dd-item');
+    if (!item) return;
+    clubeSelecionado = +item.dataset.id;
+    inp.value = uniq.find(x=>x.IdClube===clubeSelecionado)?.NomePopularClube||'';
+    dd.classList.remove('open');
+    renderClassificacao();
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) dd.classList.remove('open');
+  });
+
+  inp.addEventListener('keydown', e => {
+    if (e.key==='Escape') { inp.value=''; clubeSelecionado=null; dd.classList.remove('open'); renderClassificacao(); }
+  });
+}
+
+/* ─── CARGA ─── */
+async function carregar() {
+  try {
+    const res = await fetch(ENDPOINT);
+    if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.Sucesso||!Array.isArray(json.Retorno)||!json.Retorno.length)
+      throw new Error('Resposta inválida da FPF');
+
+    todosOsTimes = json.Retorno;
+    grupos = parseGrupos(todosOsTimes);
+
+    const fase = todosOsTimes[0].NomeFase||'';
+    const cat  = todosOsTimes[0].Categoria||'';
+    const ano  = todosOsTimes[0].Exercicio||'';
+    document.getElementById('titulo').textContent    = `Paulista ${cat} ${ano}`;
+    document.getElementById('subtitulo').textContent = `${fase} · ${grupos.length} grupos · FPF`;
+
+    setupBusca();
+    renderClassificacao();
+
+  } catch(err) {
+    document.getElementById('app').innerHTML = `
+      <div class="erro">❌ Não foi possível carregar os dados.<br><small>${err.message}</small><br><br>
+        <button onclick="location.reload()" style="margin-top:8px;padding:8px 20px;border-radius:8px;border:1px solid #ccc;cursor:pointer;font-size:14px">Tentar novamente</button>
+      </div>`;
+    document.getElementById('titulo').textContent = 'Erro ao carregar';
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
