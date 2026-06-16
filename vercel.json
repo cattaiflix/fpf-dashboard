@@ -1,11 +1,3 @@
 {
-  "version": 2,
-  "functions": {
-    "api/classificacao.js": {
-      "runtime": "edge"
-    }
-  },
-  "rewrites": [
-    { "source": "/api/classificacao", "destination": "/api/classificacao.js" }
-  ]
+  "version": 2
 }
