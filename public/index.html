@@ -571,11 +571,16 @@ async function carregar() {
 /* ─── JOGOS ─── */
 var dadosJogos = null;
 var rodadaAtiva = null;
+var modoTodasRodadas = false;
 
 function carregarJogos(rodada) {
-  rodada = rodada === undefined ? 0 : rodada;
-  var idClube = clubeSelecionado || 0;
-  var url = ENDPOINT + '?tipo=jogos&rodada=' + rodada + '&idClube=' + idClube;
+  // Se já temos dados, só troca a exibição sem novo fetch
+  if (dadosJogos) {
+    rodadaAtiva = rodada > 0 ? rodada : getRodadaAtual(dadosJogos.listData);
+    renderJogos(rodadaAtiva);
+    return;
+  }
+  var url = ENDPOINT + '?tipo=jogos&rodada=0&idClube=0';
   document.getElementById('jogos-content').innerHTML = '<div class="loading"><div class="spinner"></div>Buscando jogos...</div>';
   fetch(url)
     .then(function(r){ return r.json(); })
@@ -617,15 +622,22 @@ function isRodadaFutura(rodada, listData) {
 }
 
 function selecionarRodada(r) {
+  modoTodasRodadas = false;
   rodadaAtiva = r;
-  carregarJogos(r);
+  renderJogos(r);
+}
+
+function verTodasRodadas() {
+  modoTodasRodadas = true;
+  renderJogos(rodadaAtiva);
 }
 
 function limparFiltroJogos() {
   clubeSelecionado = null;
+  modoTodasRodadas = false;
   document.getElementById('busca').value = '';
   renderClassificacao();
-  carregarJogos(rodadaAtiva || 0);
+  if (dadosJogos) renderJogos(rodadaAtiva);
 }
 
 function renderJogos(rodadaSel) {
@@ -641,32 +653,63 @@ function renderJogos(rodadaSel) {
     timeNome = tf ? tf.NomePopularClube : null;
   }
 
+  // Modo: todas as rodadas do time OU rodada específica
+  var modoTodas = modoTodasRodadas && timeNome;
+
+  // Navegação de rodadas
   var html = '<div class="rodadas-nav">';
   listRodada.forEach(function(r){
     var rn = parseInt(r.Rodada);
     var fut = isRodadaFutura(rn, dadosJogos.listData);
-    var cls = 'rodada-btn' + (rn === rodadaSel ? ' active' : '') + (fut ? ' futura' : '');
+    var cls = 'rodada-btn' + (!modoTodas && rn === rodadaSel ? ' active' : '') + (fut ? ' futura' : '');
     html += '<button class="' + cls + '" onclick="selecionarRodada(' + rn + ')">R' + r.Rodada + '</button>';
   });
   html += '</div>';
 
+  // Barra de filtro do time
   if (timeNome) {
-    html += '<div class="jogos-filtro-info">📌 Jogos de <strong>' + timeNome + '</strong> <button onclick="limparFiltroJogos()">✕ ver todos</button></div>';
+    html += '<div class="jogos-filtro-info">';
+    html += '<span>📌 Jogos de <strong>' + timeNome + '</strong></span>';
+    html += '<span style="display:flex;gap:8px;align-items:center">';
+    if (!modoTodas) {
+      html += '<button onclick="verTodasRodadas()" style="font-size:11px;color:var(--verde);background:none;border:none;cursor:pointer;font-weight:600">📅 Ver todas as rodadas</button>';
+    } else {
+      html += '<button onclick="selecionarRodada(rodadaAtiva)" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:600">← Ver rodada atual</button>';
+    }
+    html += '<button onclick="limparFiltroJogos()" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-weight:600">✕ Limpar filtro</button>';
+    html += '</span></div>';
   }
 
-  var jogosDaRodada = listTabela.filter(function(j){ return j.Rodada === rodadaSel; });
-  html += '<div class="rodada-titulo">Rodada ' + rodadaSel + ' &middot; ' + jogosDaRodada.length + ' jogos</div>';
+  // Definir quais jogos mostrar
+  var jogosParaExibir;
+  if (modoTodas) {
+    // Todos os jogos do time em todas as rodadas
+    jogosParaExibir = listTabela.filter(function(j){
+      return j.NomePopularMandante === timeNome || j.NomePopularVisitante === timeNome;
+    });
+    html += '<div class="rodada-titulo">Todos os jogos de ' + timeNome + ' &middot; ' + jogosParaExibir.length + ' partidas</div>';
+  } else {
+    jogosParaExibir = listTabela.filter(function(j){ return j.Rodada === rodadaSel; });
+    html += '<div class="rodada-titulo">Rodada ' + rodadaSel + ' &middot; ' + jogosParaExibir.length + ' jogos</div>';
+  }
+
   html += '<div class="jogos-grid">';
 
-  // Agrupar por data
+  // Agrupar por rodada+data
   var porData = {};
-  jogosDaRodada.forEach(function(j){
-    if (!porData[j.Data]) porData[j.Data] = [];
-    porData[j.Data].push(j);
+  jogosParaExibir.forEach(function(j){
+    var chave = modoTodas ? ('Rodada ' + j.Rodada + '|' + j.Data) : j.Data;
+    if (!porData[chave]) porData[chave] = { rodada: j.Rodada, data: j.Data, jogos: [] };
+    porData[chave].jogos.push(j);
   });
 
-  Object.keys(porData).sort().forEach(function(data){
-    porData[data].forEach(function(j){
+  Object.keys(porData).sort().forEach(function(chave){
+    var grupo = porData[chave];
+    // Título de separação por rodada no modo todas as rodadas
+    if (modoTodas) {
+      html += '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem;padding-bottom:4px;border-bottom:1px solid var(--borda)">Rodada ' + grupo.rodada + ' &middot; ' + grupo.jogos[0].DiaSemanaExtenso + ', ' + grupo.data + '</div>';
+    }
+    grupo.jogos.forEach(function(j){
       var futuro = isJogoFuturo(j.Data);
       var jogoDoTime = timeNome && (j.NomePopularMandante === timeNome || j.NomePopularVisitante === timeNome);
       html += '<div class="jogo-card' + (jogoDoTime ? ' destaque-jogo' : '') + '">';
