@@ -335,9 +335,11 @@ function buildTabela(grupo, destaque, top2ids) {
   const rows = grupo.times.map(t => {
     const rc = rowClass(t.Classificacao, t.IdClube, top2ids);
     const sel = destaque===t.IdClube ? ' destaque' : '';
+    const esc = getEscudo(t.NomePopularClube);
+    const escImg = esc ? `<img src="${esc}" style="width:20px;height:20px;object-fit:contain;margin-right:6px;vertical-align:middle;border-radius:2px" onerror="this.style.display='none'" alt="">` : '';
     return `<tr class="${rc}${sel}">
       <td>${t.Classificacao}</td>
-      <td title="${t.NomePopularClube}">${t.NomePopularClube}</td>
+      <td title="${t.NomePopularClube}">${escImg}${t.NomePopularClube}</td>
       <td><strong>${t.Pontos}</strong></td>
       <td>${t.NumeroPartidas}</td>
       <td>${t.Vitorias}</td><td>${t.Empates}</td><td>${t.Derrota}</td>
@@ -408,8 +410,11 @@ function buildChaveCard(chave, top2) {
     }
 
     const pendente = !time;
+    const escudo = time ? getEscudo(time.NomePopularClube) : null;
+    const escImg = escudo ? `<img src="${escudo}" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;border-radius:2px" onerror="this.style.display='none'" alt="">` : '<span style="width:22px;display:inline-block"></span>';
     return `<div class="chave-time${pendente?' pendente':''}">
       <span class="chave-pos ${posCls}">${posLabel}</span>
+      ${escImg}
       <span class="chave-nome">${time ? time.NomePopularClube : '—'}</span>
       ${time ? `<span class="chave-pts">${time.Pontos}pts</span>` : ''}
     </div>
@@ -551,13 +556,17 @@ function setupBusca() {
 /* ─── CARGA ─── */
 async function carregar() {
   var ctrl = new AbortController();
-  var timer = setTimeout(function(){ ctrl.abort(); }, 15000); // 15s timeout
+  var timer = setTimeout(function(){ ctrl.abort(); }, 15000);
   try {
-    const res = await fetch(ENDPOINT, { signal: ctrl.signal });
+    // Carregar classificação e escudos em paralelo
+    const [resClassif, resJogos] = await Promise.all([
+      fetch(ENDPOINT, { signal: ctrl.signal }),
+      fetch(ENDPOINT + '?tipo=jogos&rodada=0&idClube=0')
+    ]);
     clearTimeout(timer);
-    if (!res.ok) throw new Error('Proxy retornou ' + res.status);
-    const json = await res.json();
 
+    if (!resClassif.ok) throw new Error('Proxy retornou ' + resClassif.status);
+    const json = await resClassif.json();
     if (!json.Sucesso || !Array.isArray(json.Retorno) || !json.Retorno.length)
       throw new Error('Dados inválidos: ' + JSON.stringify(json).slice(0,100));
 
@@ -569,6 +578,21 @@ async function carregar() {
     var ano  = todosOsTimes[0].Exercicio || '';
     document.getElementById('titulo').textContent    = 'Paulista ' + cat + ' ' + ano;
     document.getElementById('subtitulo').textContent = fase + ' · ' + grupos.length + ' grupos · FPF';
+
+    // Popular mapa de escudos em background (não bloqueia a classificação)
+    if (resJogos.ok) {
+      resJogos.json().then(function(jj) {
+        if (jj.Sucesso && jj.Retorno && jj.Retorno.listTabela) {
+          dadosJogos = jj.Retorno;
+          jj.Retorno.listTabela.forEach(function(j) {
+            if (j.EscudoMandante) escudosMap['nome_' + j.NomePopularMandante] = j.EscudoMandante;
+            if (j.EscudoVisitante) escudosMap['nome_' + j.NomePopularVisitante] = j.EscudoVisitante;
+          });
+          // Re-renderizar classificação com escudos
+          renderClassificacao();
+        }
+      }).catch(function(){});
+    }
 
     setupBusca();
     renderClassificacao();
@@ -588,6 +612,7 @@ var dadosJogos = null;
 var rodadaAtiva = null;
 var modoTodasRodadas = false;
 var timeFiltroJogos = null; // filtro independente da aba de jogos
+var escudosMap = {}; // IdClube -> URL do escudo
 
 function setupBuscaJogos() {
   var inp = document.getElementById('busca-jogos');
@@ -694,6 +719,10 @@ function verTodasRodadas() {
   renderJogos(rodadaAtiva);
 }
 
+function getEscudo(nomeClube) {
+  return escudosMap['nome_' + nomeClube] || null;
+}
+
 function limparBuscaJogos() {
   timeFiltroJogos = null;
   modoTodasRodadas = false;
@@ -764,19 +793,22 @@ function renderJogos(rodadaSel) {
 
   html += '<div class="jogos-grid">';
 
-  // Agrupar por rodada+data
+  // Agrupar por data (modo todas rodadas) ou data simples (modo rodada)
   var porData = {};
   jogosParaExibir.forEach(function(j){
-    var chave = modoTodas ? ('Rodada ' + j.Rodada + '|' + j.Data) : j.Data;
-    if (!porData[chave]) porData[chave] = { rodada: j.Rodada, data: j.Data, jogos: [] };
+    // converter dd/mm/yyyy -> yyyy-mm-dd para ordenação correta
+    var p = j.Data.split('/');
+    var dataSort = p[2] + '-' + p[1] + '-' + p[0];
+    var chave = modoTodas ? (dataSort + '|R' + j.Rodada) : dataSort;
+    if (!porData[chave]) porData[chave] = { rodada: j.Rodada, data: j.Data, diaSemana: j.DiaSemanaExtenso, jogos: [] };
     porData[chave].jogos.push(j);
   });
 
   Object.keys(porData).sort().forEach(function(chave){
     var grupo = porData[chave];
-    // Título de separação por rodada no modo todas as rodadas
+    // Cabeçalho de data no modo todas as rodadas
     if (modoTodas) {
-      html += '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem;padding-bottom:4px;border-bottom:1px solid var(--borda)">Rodada ' + grupo.rodada + ' &middot; ' + grupo.jogos[0].DiaSemanaExtenso + ', ' + grupo.data + '</div>';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin:1rem 0 .4rem;padding-bottom:4px;border-bottom:1px solid var(--borda)">' + grupo.diaSemana + ', ' + grupo.data + ' &middot; Rodada ' + grupo.rodada + '</div>';
     }
     grupo.jogos.forEach(function(j){
       var futuro = isJogoFuturo(j.Data);
