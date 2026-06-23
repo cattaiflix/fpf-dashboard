@@ -559,6 +559,141 @@ async function carregar() {
   }
 }
 
+/* ─── JOGOS ─── */
+var dadosJogos = null;
+var rodadaAtiva = null;
+
+function carregarJogos(rodada) {
+  rodada = rodada === undefined ? 0 : rodada;
+  var idClube = clubeSelecionado || 0;
+  var url = 'https://futebolpaulista.com.br/Handlers/Competicoes/ListarTabela.ashx'
+    + '?IdCampeonato=125&Ano=2026&Rodada=' + rodada
+    + '&IdClube=' + idClube
+    + '&IdCategoria=80&_=' + Date.now();
+  document.getElementById('jogos-content').innerHTML = '<div class="loading"><div class="spinner"></div>Buscando jogos...</div>';
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(json){
+      if (!json.Sucesso || !json.Retorno) throw new Error('Sem dados');
+      dadosJogos = json.Retorno;
+      var rdAtiva = rodada > 0 ? rodada : getRodadaAtual(dadosJogos.listData);
+      rodadaAtiva = rdAtiva;
+      renderJogos(rdAtiva);
+    })
+    .catch(function(e){
+      document.getElementById('jogos-content').innerHTML = '<div class="erro">❌ Erro ao carregar jogos: ' + e.message + '</div>';
+    });
+}
+
+function getRodadaAtual(listData) {
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var found = null;
+  listData.forEach(function(d){
+    var p = d.Data.split('/');
+    var dt = new Date(p[2], p[1]-1, p[0]);
+    if (dt >= hoje && !found) found = d.Rodada;
+  });
+  return found || listData[listData.length-1].Rodada;
+}
+
+function isJogoFuturo(data) {
+  var p = data.split('/');
+  var dt = new Date(p[2], p[1]-1, p[0]); dt.setHours(23,59,59);
+  return dt > new Date();
+}
+
+function isRodadaFutura(rodada, listData) {
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var datas = listData.filter(function(d){ return d.Rodada === rodada; });
+  if (!datas.length) return false;
+  var p = datas[0].Data.split('/');
+  return new Date(p[2], p[1]-1, p[0]) > hoje;
+}
+
+function selecionarRodada(r) {
+  rodadaAtiva = r;
+  carregarJogos(r);
+}
+
+function limparFiltroJogos() {
+  clubeSelecionado = null;
+  document.getElementById('busca').value = '';
+  renderClassificacao();
+  carregarJogos(rodadaAtiva || 0);
+}
+
+function renderJogos(rodadaSel) {
+  if (!dadosJogos) return;
+  var listRodada = dadosJogos.listRodada;
+  var listTabela = dadosJogos.listTabela;
+  var upd = listTabela[0] ? (listTabela[0].UltimaSincronizacaoData + ' ' + listTabela[0].UltimaSincronizacaoHora) : '';
+
+  // Nome do time filtrado
+  var timeNome = null;
+  if (clubeSelecionado) {
+    var tf = todosOsTimes.find(function(t){ return t.IdClube === clubeSelecionado; });
+    timeNome = tf ? tf.NomePopularClube : null;
+  }
+
+  var html = '<div class="rodadas-nav">';
+  listRodada.forEach(function(r){
+    var rn = parseInt(r.Rodada);
+    var fut = isRodadaFutura(rn, dadosJogos.listData);
+    var cls = 'rodada-btn' + (rn === rodadaSel ? ' active' : '') + (fut ? ' futura' : '');
+    html += '<button class="' + cls + '" onclick="selecionarRodada(' + rn + ')">R' + r.Rodada + '</button>';
+  });
+  html += '</div>';
+
+  if (timeNome) {
+    html += '<div class="jogos-filtro-info">📌 Jogos de <strong>' + timeNome + '</strong> <button onclick="limparFiltroJogos()">✕ ver todos</button></div>';
+  }
+
+  var jogosDaRodada = listTabela.filter(function(j){ return j.Rodada === rodadaSel; });
+  html += '<div class="rodada-titulo">Rodada ' + rodadaSel + ' &middot; ' + jogosDaRodada.length + ' jogos</div>';
+  html += '<div class="jogos-grid">';
+
+  // Agrupar por data
+  var porData = {};
+  jogosDaRodada.forEach(function(j){
+    if (!porData[j.Data]) porData[j.Data] = [];
+    porData[j.Data].push(j);
+  });
+
+  Object.keys(porData).sort().forEach(function(data){
+    porData[data].forEach(function(j){
+      var futuro = isJogoFuturo(j.Data);
+      var jogoDoTime = timeNome && (j.NomePopularMandante === timeNome || j.NomePopularVisitante === timeNome);
+      html += '<div class="jogo-card' + (jogoDoTime ? ' destaque-jogo' : '') + '">';
+      html += '<div class="jogo-header">';
+      html += '<span>Grupo ' + j.Grupo + ' &middot; ' + j.DiaSemanaExtenso + ', ' + j.Data + (j.Horario ? ' &middot; ' + j.Horario : '') + '</span>';
+      html += '<span>' + (futuro ? '<span class="badge-futuro">A jogar</span>' : '<span class="badge-passado">Encerrado</span>') + '</span>';
+      html += '</div>';
+      html += '<div class="jogo-body">';
+      html += '<div class="jogo-time mandante">';
+      if (j.EscudoMandante) html += '<img class="jogo-escudo" src="' + j.EscudoMandante + '" alt="" onerror="this.style.display='none'">';
+      html += '<span class="jogo-nome">' + j.NomePopularMandante + '</span></div>';
+      html += '<div class="jogo-placar">';
+      if (futuro) {
+        html += '<span class="placar-vazio">' + (j.Horario || 'A definir') + '</span>';
+      } else {
+        html += '<span class="placar-num">' + (j.ResultadoMandante !== null && j.ResultadoMandante !== undefined ? j.ResultadoMandante : '-') + '</span>';
+        html += '<span class="placar-x">&#215;</span>';
+        html += '<span class="placar-num">' + (j.ResultadoVisitante !== null && j.ResultadoVisitante !== undefined ? j.ResultadoVisitante : '-') + '</span>';
+      }
+      html += '</div>';
+      html += '<div class="jogo-time visitante">';
+      html += '<span class="jogo-nome">' + j.NomePopularVisitante + '</span>';
+      if (j.EscudoVisitante) html += '<img class="jogo-escudo" src="' + j.EscudoVisitante + '" alt="" onerror="this.style.display='none'">';
+      html += '</div></div>';
+      if (j.Municipio) html += '<div class="jogo-info"><span>&#128205; ' + (j.NomePopularEstadio || '') + (j.Municipio ? ' &mdash; ' + j.Municipio : '') + '</span></div>';
+      html += '</div>';
+    });
+  });
+
+  html += '</div><div class="footer-note">Fonte: FPF &middot; Última atualização: ' + upd + '</div>';
+  document.getElementById('jogos-content').innerHTML = html;
+}
+
 carregar();
 </script>
 </body>
