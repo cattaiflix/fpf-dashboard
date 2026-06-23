@@ -679,7 +679,7 @@ function renderJogos(rodadaSel) {
       html += '</div>';
       html += '<div class="jogo-body">';
       html += '<div class="jogo-time mandante">';
-      if (j.EscudoMandante) html += '<img class="jogo-escudo" src="' + j.EscudoMandante + '" alt="" onerror="this.style.display='none'">';
+      if (j.EscudoMandante) html += "<img class=\"jogo-escudo\" src=\"" + j.EscudoMandante + "\" alt=\"\"></img>";
       html += '<span class="jogo-nome">' + j.NomePopularMandante + '</span></div>';
       html += '<div class="jogo-placar">';
       if (futuro) {
@@ -692,7 +692,7 @@ function renderJogos(rodadaSel) {
       html += '</div>';
       html += '<div class="jogo-time visitante">';
       html += '<span class="jogo-nome">' + j.NomePopularVisitante + '</span>';
-      if (j.EscudoVisitante) html += '<img class="jogo-escudo" src="' + j.EscudoVisitante + '" alt="" onerror="this.style.display='none'">';
+      if (j.EscudoVisitante) html += "<img class=\"jogo-escudo\" src=\"" + j.EscudoVisitante + "\" alt=\"\"></img>";
       html += '</div></div>';
       if (j.Municipio) html += '<div class="jogo-info"><span>&#128205; ' + (j.NomePopularEstadio || '') + (j.Municipio ? ' &mdash; ' + j.Municipio : '') + '</span></div>';
       html += '</div>';
