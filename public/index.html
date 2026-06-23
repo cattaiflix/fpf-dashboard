@@ -575,10 +575,7 @@ var rodadaAtiva = null;
 function carregarJogos(rodada) {
   rodada = rodada === undefined ? 0 : rodada;
   var idClube = clubeSelecionado || 0;
-  var url = 'https://futebolpaulista.com.br/Handlers/Competicoes/ListarTabela.ashx'
-    + '?IdCampeonato=125&Ano=2026&Rodada=' + rodada
-    + '&IdClube=' + idClube
-    + '&IdCategoria=80&_=' + Date.now();
+  var url = ENDPOINT + '?tipo=jogos&rodada=' + rodada + '&idClube=' + idClube;
   document.getElementById('jogos-content').innerHTML = '<div class="loading"><div class="spinner"></div>Buscando jogos...</div>';
   fetch(url)
     .then(function(r){ return r.json(); })
