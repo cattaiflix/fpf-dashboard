@@ -223,6 +223,11 @@
 
   <!-- ABA JOGOS -->
   <div id="aba-jogos" style="display:none">
+    <div class="busca-jogos-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="busca-jogos" placeholder="Filtrar por time nos jogos..." autocomplete="off">
+      <div class="dropdown" id="dropdown-jogos"></div>
+    </div>
     <div id="jogos-content">
       <div class="loading"><div class="spinner"></div>Buscando jogos...</div>
     </div>
@@ -487,7 +492,10 @@ function trocarAba(aba, el) {
   document.getElementById('aba-jogos').style.display      = aba==='jogos'           ? '' : 'none';
   document.getElementById('aba-matamata').style.display   = aba==='matamata'        ? '' : 'none';
   if (aba === 'matamata' && grupos.length) renderMataMata();
-  if (aba === 'jogos') { if (!dadosJogos) carregarJogos(0); else renderJogos(rodadaAtiva); }
+  if (aba === 'jogos') {
+    setupBuscaJogos();
+    if (!dadosJogos) carregarJogos(0); else renderJogos(rodadaAtiva);
+  }
 }
 
 /* ─── BUSCA ─── */
@@ -520,7 +528,7 @@ function setupBusca() {
     inp.value = t ? t.NomePopularClube : '';
     dd.classList.remove('open');
     renderClassificacao();
-    if (abaAtual === 'jogos') { dadosJogos = null; carregarJogos(0); }
+    // filtro da classificação é independente dos jogos
     window.scrollTo({top:0,behavior:'smooth'});
   });
 
@@ -572,6 +580,53 @@ async function carregar() {
 var dadosJogos = null;
 var rodadaAtiva = null;
 var modoTodasRodadas = false;
+var timeFiltroJogos = null; // filtro independente da aba de jogos
+
+function setupBuscaJogos() {
+  var inp = document.getElementById('busca-jogos');
+  var dd = document.getElementById('dropdown-jogos');
+  if (!inp) return;
+
+  inp.addEventListener('input', function() {
+    var v = inp.value.trim().toLowerCase();
+    if (v.length < 2) { dd.classList.remove('open'); return; }
+    var uniq = [...new Map(todosOsTimes.map(function(t){ return [t.IdClube, t]; })).values()]
+      .sort(function(a,b){ return a.NomePopularClube.localeCompare(b.NomePopularClube); });
+    var res = uniq.filter(function(t){ return t.NomePopularClube.toLowerCase().includes(v); });
+    if (!res.length) { dd.classList.remove('open'); return; }
+    var g;
+    dd.innerHTML = res.map(function(t) {
+      g = grupos.find(function(gr){ return gr.times.some(function(x){ return x.IdClube === t.IdClube; }); });
+      return '<div class="dd-item" data-id="' + t.IdClube + '" data-nome="' + t.NomePopularClube + '">'
+        + t.NomePopularClube + '<span>' + (g ? g.nome : '') + '</span></div>';
+    }).join('');
+    dd.classList.add('open');
+  });
+
+  dd.addEventListener('click', function(e) {
+    var item = e.target.closest('.dd-item');
+    if (!item) return;
+    timeFiltroJogos = item.dataset.nome;
+    inp.value = timeFiltroJogos;
+    dd.classList.remove('open');
+    modoTodasRodadas = true;
+    renderJogos(rodadaAtiva);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.busca-jogos-wrap')) dd.classList.remove('open');
+  });
+
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      inp.value = '';
+      timeFiltroJogos = null;
+      modoTodasRodadas = false;
+      dd.classList.remove('open');
+      renderJogos(rodadaAtiva);
+    }
+  });
+}
 
 function carregarJogos(rodada) {
   // Se já temos dados, só troca a exibição sem novo fetch
@@ -632,9 +687,20 @@ function verTodasRodadas() {
   renderJogos(rodadaAtiva);
 }
 
+function limparBuscaJogos() {
+  timeFiltroJogos = null;
+  modoTodasRodadas = false;
+  var inp = document.getElementById('busca-jogos');
+  if (inp) inp.value = '';
+  renderJogos(rodadaAtiva);
+}
+
 function limparFiltroJogos() {
   clubeSelecionado = null;
   modoTodasRodadas = false;
+  timeFiltroJogos = null;
+  var inp = document.getElementById('busca-jogos');
+  if (inp) inp.value = '';
   document.getElementById('busca').value = '';
   renderClassificacao();
   if (dadosJogos) renderJogos(rodadaAtiva);
@@ -646,12 +712,8 @@ function renderJogos(rodadaSel) {
   var listTabela = dadosJogos.listTabela;
   var upd = listTabela[0] ? (listTabela[0].UltimaSincronizacaoData + ' ' + listTabela[0].UltimaSincronizacaoHora) : '';
 
-  // Nome do time filtrado
-  var timeNome = null;
-  if (clubeSelecionado) {
-    var tf = todosOsTimes.find(function(t){ return t.IdClube === clubeSelecionado; });
-    timeNome = tf ? tf.NomePopularClube : null;
-  }
+  // Nome do time filtrado — usa filtro independente da aba de jogos
+  var timeNome = timeFiltroJogos || null;
 
   // Modo: todas as rodadas do time OU rodada específica
   var modoTodas = modoTodasRodadas && timeNome;
@@ -676,7 +738,7 @@ function renderJogos(rodadaSel) {
     } else {
       html += '<button onclick="selecionarRodada(rodadaAtiva)" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:600">← Ver rodada atual</button>';
     }
-    html += '<button onclick="limparFiltroJogos()" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-weight:600">✕ Limpar filtro</button>';
+    html += '<button onclick="limparBuscaJogos()" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-weight:600">✕ Limpar filtro</button>';
     html += '</span></div>';
   }
 
