@@ -506,7 +506,12 @@ function trocarAba(aba, el) {
   if (aba === 'matamata' && grupos.length) renderMataMata();
   if (aba === 'jogos') {
     setupBuscaJogos();
-    if (!dadosJogos) carregarJogos(0); else renderJogos(rodadaAtiva);
+    if (!dadosJogos) {
+      carregarJogos(0);
+    } else {
+      if (!rodadaAtiva) rodadaAtiva = getRodadaAtual(dadosJogos.listData);
+      renderJogos(rodadaAtiva);
+    }
   }
 }
 
@@ -588,6 +593,8 @@ async function carregar() {
             if (j.EscudoMandante) escudosMap['nome_' + j.NomePopularMandante] = j.EscudoMandante;
             if (j.EscudoVisitante) escudosMap['nome_' + j.NomePopularVisitante] = j.EscudoVisitante;
           });
+          // Definir rodada ativa (próxima a acontecer)
+          rodadaAtiva = getRodadaAtual(dadosJogos.listData);
           // Re-renderizar classificação com escudos
           renderClassificacao();
         }
