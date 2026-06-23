@@ -481,11 +481,13 @@ function renderClassificacao() {
 /* ─── ABAS ─── */
 function trocarAba(aba, el) {
   abaAtual = aba;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
   el.classList.add('active');
   document.getElementById('aba-classificacao').style.display = aba==='classificacao' ? '' : 'none';
-  document.getElementById('aba-matamata').style.display = aba==='matamata' ? '' : 'none';
-  if (aba==='matamata' && grupos.length) renderMataMata();
+  document.getElementById('aba-jogos').style.display      = aba==='jogos'           ? '' : 'none';
+  document.getElementById('aba-matamata').style.display   = aba==='matamata'        ? '' : 'none';
+  if (aba === 'matamata' && grupos.length) renderMataMata();
+  if (aba === 'jogos') { if (!dadosJogos) carregarJogos(0); else renderJogos(rodadaAtiva); }
 }
 
 /* ─── BUSCA ─── */
@@ -510,13 +512,15 @@ function setupBusca() {
     dd.classList.add('open');
   });
 
-  dd.addEventListener('click', e => {
-    const item = e.target.closest('.dd-item');
+  dd.addEventListener('click', function(e) {
+    var item = e.target.closest('.dd-item');
     if (!item) return;
     clubeSelecionado = +item.dataset.id;
-    inp.value = uniq.find(x=>x.IdClube===clubeSelecionado)?.NomePopularClube||'';
+    var t = uniq.find(function(x){ return x.IdClube === clubeSelecionado; });
+    inp.value = t ? t.NomePopularClube : '';
     dd.classList.remove('open');
     renderClassificacao();
+    if (abaAtual === 'jogos') { dadosJogos = null; carregarJogos(0); }
     window.scrollTo({top:0,behavior:'smooth'});
   });
 
@@ -524,7 +528,7 @@ function setupBusca() {
     if (!e.target.closest('.search-wrap')) dd.classList.remove('open');
   });
 
-  inp.addEventListener('keydown', e => {
+  inp.addEventListener('keydown', function(e) {
     if (e.key==='Escape') { inp.value=''; clubeSelecionado=null; dd.classList.remove('open'); renderClassificacao(); }
   });
 }
