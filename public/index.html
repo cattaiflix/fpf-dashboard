@@ -188,6 +188,13 @@
     .badge-passado { display: inline-block; background: rgba(15,110,86,.1); color: #0F6E56; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(15,110,86,.2); }
     .jogos-filtro-info { font-size: 12px; color: var(--muted); margin-bottom: 1rem; padding: 8px 12px; background: var(--card); border: 1px solid var(--borda); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
     .jogos-filtro-info button { font-size: 11px; color: var(--accent); background: none; border: none; cursor: pointer; font-weight: 600; }
+
+    .busca-jogos-wrap{position:relative;margin-bottom:1.25rem;width:100%}
+    .busca-jogos-wrap input{display:block;width:100%;padding:10px 16px 10px 40px;border:1.5px solid var(--borda);border-radius:12px;background:var(--card);font-size:14px;color:var(--texto);outline:none;transition:all .15s;box-shadow:0 1px 4px rgba(10,45,110,.06);box-sizing:border-box}
+    .busca-jogos-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(19,68,160,.1)}
+    .busca-jogos-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px;pointer-events:none;line-height:1}
+    .busca-jogos-dd{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1.5px solid var(--borda);border-radius:10px;max-height:220px;overflow-y:auto;z-index:200;display:none;box-shadow:0 4px 16px rgba(0,0,0,.1)}
+    .busca-jogos-dd.open{display:block}
   </style>
 </head>
 <body>
@@ -224,9 +231,9 @@
   <!-- ABA JOGOS -->
   <div id="aba-jogos" style="display:none">
     <div class="busca-jogos-wrap">
-      <span class="search-icon">🔍</span>
+      <span class="busca-jogos-icon">🔍</span>
       <input type="text" id="busca-jogos" placeholder="Filtrar por time nos jogos..." autocomplete="off">
-      <div class="dropdown" id="dropdown-jogos"></div>
+      <div class="busca-jogos-dd" id="dropdown-jogos"></div>
     </div>
     <div id="jogos-content">
       <div class="loading"><div class="spinner"></div>Buscando jogos...</div>
@@ -597,8 +604,8 @@ function setupBuscaJogos() {
     var g;
     dd.innerHTML = res.map(function(t) {
       g = grupos.find(function(gr){ return gr.times.some(function(x){ return x.IdClube === t.IdClube; }); });
-      return '<div class="dd-item" data-id="' + t.IdClube + '" data-nome="' + t.NomePopularClube + '">'
-        + t.NomePopularClube + '<span>' + (g ? g.nome : '') + '</span></div>';
+      return '<div class="dd-item" data-id="' + t.IdClube + '" data-nome="' + t.NomePopularClube + '" style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:.5px solid var(--borda);display:flex;justify-content:space-between">'
+        + t.NomePopularClube + '<span style="font-size:11px;color:var(--muted)">' + (g ? g.nome : '') + '</span></div>';
     }).join('');
     dd.classList.add('open');
   });
@@ -615,7 +622,7 @@ function setupBuscaJogos() {
 
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.busca-jogos-wrap')) dd.classList.remove('open');
-  });
+  }, true);
 
   inp.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
