@@ -535,30 +535,35 @@ function setupBusca() {
 
 /* ─── CARGA ─── */
 async function carregar() {
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 15000); // 15s timeout
   try {
-    const res = await fetch(ENDPOINT);
-    if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
+    const res = await fetch(ENDPOINT, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error('Proxy retornou ' + res.status);
     const json = await res.json();
-    if (!json.Sucesso||!Array.isArray(json.Retorno)||!json.Retorno.length)
-      throw new Error('Resposta inválida da FPF');
+
+    if (!json.Sucesso || !Array.isArray(json.Retorno) || !json.Retorno.length)
+      throw new Error('Dados inválidos: ' + JSON.stringify(json).slice(0,100));
 
     todosOsTimes = json.Retorno;
     grupos = parseGrupos(todosOsTimes);
 
-    const fase = todosOsTimes[0].NomeFase||'';
-    const cat  = todosOsTimes[0].Categoria||'';
-    const ano  = todosOsTimes[0].Exercicio||'';
-    document.getElementById('titulo').textContent    = `Paulista ${cat} ${ano}`;
-    document.getElementById('subtitulo').textContent = `${fase} · ${grupos.length} grupos · FPF`;
+    var fase = todosOsTimes[0].NomeFase || '';
+    var cat  = todosOsTimes[0].Categoria || '';
+    var ano  = todosOsTimes[0].Exercicio || '';
+    document.getElementById('titulo').textContent    = 'Paulista ' + cat + ' ' + ano;
+    document.getElementById('subtitulo').textContent = fase + ' · ' + grupos.length + ' grupos · FPF';
 
     setupBusca();
     renderClassificacao();
 
   } catch(err) {
-    document.getElementById('app').innerHTML = `
-      <div class="erro">❌ Não foi possível carregar os dados.<br><small>${err.message}</small><br><br>
-        <button onclick="location.reload()" style="margin-top:8px;padding:8px 20px;border-radius:8px;border:1px solid #ccc;cursor:pointer;font-size:14px">Tentar novamente</button>
-      </div>`;
+    clearTimeout(timer);
+    var msg = err.name === 'AbortError' ? 'Timeout — servidor demorou mais de 15s' : err.message;
+    document.getElementById('app').innerHTML =
+      '<div class="erro">❌ ' + msg + '<br><br>' +
+      '<button onclick="location.reload()" style="margin-top:8px;padding:8px 20px;border-radius:8px;border:1px solid #ccc;cursor:pointer;font-size:14px">Tentar novamente</button></div>';
     document.getElementById('titulo').textContent = 'Erro ao carregar';
   }
 }
